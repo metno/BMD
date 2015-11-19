@@ -4,7 +4,7 @@
 ## EXMWF (monthly fields). It then performs model output statistics (MOS)
 ## to downscale the seasonal forecasts. The strategy is to use each ensemble
 ## member in the regression analysis, which implies that the size of the
-## calibration sample is ensemble size * number of years. The downscaling
+## calibration sample is ensemble size * number of years. The downscalingdis
 ## is applied to 3-month aggregated forecasts. The MOS makes use of PCA for
 ## representing the predictands (http://dx.doi.org/10.3402/tellusa.v67.28326).
 ## (Based on sf4specs.R).
@@ -388,7 +388,7 @@ display.sf <- function(x,x0=NULL,is=1) {
   points(year(z),coredata(z),cex=3,pch=19)
 }
 
-distribution.sf <- function(x,x0=NULL,is=1,it=NULL) {
+distribution.sf <- function(x,x0=NULL,breaks=NULL,is=1,it=NULL) {
   y <- subset(x,is=is)
   if (is.null(it)) it <- year(y)[length(index(y))]
   y <- subset(y,it=it)
@@ -398,16 +398,19 @@ distribution.sf <- function(x,x0=NULL,is=1,it=NULL) {
   if (unit(x)[1]=='degC') unit <- 'degree*C'
   xlab <- eval(parse(text=paste('expression(',varid,
                        ' * ~(',unit[1],'))')))
-  hist(coredata(y),col='grey',xlab=xlab,freq=FALSE,
+  yx <- max(abs(coredata(y)),na.rm=TRUE)
+  if (is.null(breaks)) breaks <- round(seq(-yx,yx,length=7))
+  hist(coredata(y),col='grey',xlab=xlab,freq=FALSE,breaks=breaks,
        main=paste(paste(attr(x,'mons'),collapse='-'),it))
   if (!is.null(x0)) {
     y0 <- subset(x0,is=is) + mean(y,na.rm=TRUE)
     y0 <- subset(y0,it=it)
-    h0 <- hist(coredata(y0),plot=FALSE)
+    h0 <- hist(coredata(y0),breakse=breaks,plot=FALSE)
     lines(h0$mids,h0$density,lwd=5,
           col=rgb(0.25,0.25,0.75,0.25))
   }
 }
+
 
 ## End of the section with functions -------------------------------
 

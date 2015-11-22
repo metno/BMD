@@ -4,7 +4,7 @@
 ## EXMWF (monthly fields). It then performs model output statistics (MOS)
 ## to downscale the seasonal forecasts. The strategy is to use each ensemble
 ## member in the regression analysis, which implies that the size of the
-## calibration sample is ensemble size * number of years. The downscalingdis
+## calibration sample is ensemble size * number of years. The downscaling
 ## is applied to 3-month aggregated forecasts. The MOS makes use of PCA for
 ## representing the predictands (http://dx.doi.org/10.3402/tellusa.v67.28326).
 ## (Based on sf4specs.R).
@@ -172,7 +172,7 @@ forecast2field <- function(x,member=1,lag=1,verbose=FALSE) {
 }
 
 gridmap <- function(Y,breaks=NULL,pal=NULL,verbose=FALSE) {
-  library(LatticeKrig)
+  require(LatticeKrig)
 
   y <- apply(annual(Y,FUN='sum'),2,'mean',na.rm=TRUE)
 
@@ -241,10 +241,26 @@ threemonths <- function(Z1,Z2,Z3,m1,m2,m3) {
     invisible(Z)
 }
 
-downscaleSFC <- function(tx.bmd,FUN='mean',param='T2M',
-                         plot=FALSE,verbose=FALSE,
-                         path='sesong4bmd',pattern='fcmean.mmsa.') {
+## Extract the same three months as from seasonal forecasts from
+## observations.
+obsthreemonths <- function(x,mons,FUN='mean') {
+  y1m <- as.monthly(subset(x,it=mons[1]),FUN=FUN)
+                                        # pick the three months following the
+  y2m <- as.monthly(subset(x,it=mons[2]),FUN=FUN)
+                                        # forecast. But the months may spill
+  y3m <- as.monthly(subset(x,it=mons[3]),FUN=FUN)
+                                        # over to the next year (eg Dec-Jan-Feb)
+  print('Aggregate over next three forecast months')
+  m1 <- (1:12)[is.element(month.abb,mons[1])]
+  m2 <- (1:12)[is.element(month.abb,mons[2])]
+  m3 <- (1:12)[is.element(month.abb,mons[3])]
+  Ys <- threemonths(y1m,y2m,y3m,m1,m2,m3)
+  invisible(Ys)
+}
 
+downscaleSFC <- function(tx.bmd,FUN='mean',param='T2M',
+                         plot=FALSE,verbose=FALSE,n=3,
+                         path='sesong4bmd',pattern='fcmean.mmsa.') {
 
   ## Process the predictors: --------------------------------------
   ## Retrieve the predictors from sf system 4 (MOS): from /opdata
@@ -322,6 +338,7 @@ downscaleSFC <- function(tx.bmd,FUN='mean',param='T2M',
 
 
   ## Process the predictands:---------------------------------------------
+
   ## Aggregate 3-month means from the stations:
   print('Extract predictands for the three forecast months')
   y1m <- as.monthly(subset(tx.bmd,it=mons[1]),FUN=FUN)
@@ -357,7 +374,7 @@ downscaleSFC <- function(tx.bmd,FUN='mean',param='T2M',
 
   ## Downscale the data using PCA data:
   print("Downscale the station data using seasonal fcst as predictor")
-  Z <- DS(pca,eof.fcst,n=4)
+  Z <- DS(pca,eof.fcst,n=n)
   if (plot) {dev.new(); plot(Z)}
   attr(Z,'eof.fcst') <- eof.fcst
   attr(Z,'mons') <- mons
@@ -381,14 +398,37 @@ display.sf <- function(x,x0=NULL,is=1) {
        main=loc(y),ylab=ylab,xlab='year')
   grid()
   if (!is.null(x0)) {
-    y0 <- subset(x0,is=is) + mean(y,na.rm=TRUE)
+    y0 <- subset(x0,is=is)
     points(year(y0)+0.33,coredata(y0),cex=1.5,lwd=2,
            pch=4,col=rgb(0.25,0.25,0.75,0.15))
   }
   points(year(z),coredata(z),cex=3,pch=19)
 }
 
-distribution.sf <- function(x,x0=NULL,breaks=NULL,is=1,it=NULL) {
+## Estimate the daily mean temperature from the daily min and max
+dailymeanT <- function(tx.bmd,tn.bmd,verbose=FALSE) {
+  ## make sure that the mean is estimated using the same stations
+  if (verbose) print('dailymeanT')
+  isn <- is.element(stid(tn.bmd),stid(tx.bmd))
+  isx <- is.element(stid(tx.bmd),stid(tn.bmd))
+  tn.bmd <- subset(tn.bmd,is=isn)
+  tx.bmd <- subset(tx.bmd,is=isx)
+  if (verbose) {print(stid(tn.bmd)); print(stid(tx.bmd))}
+  if (sum(stid(tn.bmd) - stid(tx.bmd)) != 0)
+    stop('dailymeanT: stations are not corresponding')
+  t2m <- 0.5*(zoo(tn.bmd)+zoo(tx.bmd))
+  class(t2m) <- class(tn.bmd)
+  t2m <- attrcp(tn.bmd,t2m)
+  attr(t2m,'variable') <- 't2m'
+  attr(t2m,'longname') <- 'daily mean temperature'
+  attr(t2m,'info') <- '0.5*(Tn+Tx)'
+  attr(t2m,'history') <- history.stamp(tn.bmd)
+  invisible(t2m)
+}
+  
+## Distribution plots histograms for terciles by default. 
+distribution.sf <- function(x,x0=NULL,Y3m=NULL,col=c('blue','green','red'),
+                            breaks=NULL,is=1,it=NULL) {
   y <- subset(x,is=is)
   if (is.null(it)) it <- year(y)[length(index(y))]
   y <- subset(y,it=it)
@@ -398,19 +438,111 @@ distribution.sf <- function(x,x0=NULL,breaks=NULL,is=1,it=NULL) {
   if (unit(x)[1]=='degC') unit <- 'degree*C'
   xlab <- eval(parse(text=paste('expression(',varid,
                        ' * ~(',unit[1],'))')))
-  yx <- max(abs(coredata(y)),na.rm=TRUE)
-  if (is.null(breaks)) breaks <- round(seq(-yx,yx,length=7))
-  hist(coredata(y),col='grey',xlab=xlab,freq=FALSE,breaks=breaks,
+  if (is.null(breaks)) {
+    yx <- max(abs(coredata(y)),na.rm=TRUE)
+    if (is.null(Y3m)) breaks <- round(seq(-yx,yx,length=7)) else {
+      ## Use the observations to define the categories low, neutral, high
+      obs <- subset(Y3m,is=is)
+      breaks <- qnorm(p=c(0.1,0.333,0.666,0.9),
+                      mean=mean(coredata(obs),na.rm=TRUE))
+    }
+  }
+  y <- coredata(y)
+  y[y < min(breaks)] <- min(breaks)
+  y[y > max(breaks)] <- max(breaks)
+  print(breaks); print(summary(y))
+  hist(y,col=col,xlab=xlab,freq=FALSE,breaks=breaks,
+       xlim=range(breaks),
        main=paste(paste(attr(x,'mons'),collapse='-'),it))
   if (!is.null(x0)) {
-    y0 <- subset(x0,is=is) + mean(y,na.rm=TRUE)
-    y0 <- subset(y0,it=it)
-    h0 <- hist(coredata(y0),breakse=breaks,plot=FALSE)
+    y0 <- subset(x0,is=is)
+    y0 <- coredata(subset(y0,it=it))
+    y0[y0 < min(breaks)] <- min(breaks)
+    y0[y0 > max(breaks)] <- max(breaks)
+    h0 <- hist(y0,breaks=breaks,plot=FALSE)
     lines(h0$mids,h0$density,lwd=5,
           col=rgb(0.25,0.25,0.75,0.25))
   }
 }
 
+sf <- function(tx.bmd,anomaly=NULL,param='T2M',save=TRUE,FUN='mean',
+               path='sesong4bmd',pattern='fcmean.mmsa.',n=3,
+               verbose=FALSE,plot=FALSE) {
+  
+  ## Default: if temperature, plot anomalies, but for precip show
+  ## the full values (anomaly is applied to daily data and the
+  ## seasonal forecasts for temperature are provided as anomalies)
+  if (verbose) print('sf')
+  if (is.null(anomaly)) anomaly <- is.T(tx.bmd)
+  if (anomaly) tx.bmd <- anomaly(tx.bmd)
+  
+## Downscaled seasonal forecasts based on MOS and PCA representation
+## of predictands:
+Z <- downscaleSFC(tx.bmd,param=param,FUN=FUN,path=path,pattern=pattern,
+                  n=n,plot=plot,verbose=verbose)
+
+sfc.mos <- as.station(predict(Z,newdata=attr(Z,'eof.fcst')))
+
+## Get the seasonal forecasts interpolated directly from the models if the
+  ## predictand is the daily mean temperature:
+if (varid(tx.bmd)[1]=='t2m')
+  sfc.int <- regrid(attr(Z,'sf4bmd'),is=attr(Z,'Y')) else
+  sfc.int <- NULL
+
+## Save the results for furthr processing
+  rname <- paste('sesong4bmd/bmd.results.',varid(tx.bmd)[1],sep='')
+print(paste('Saving results in bmd.results.',varid(tx.bmd)[1],'.rda',sep=''))
+if (save) save(file=paste(rname,'.rda',sep=''),Z,sfc.mos,sfc.int)
+
+## Use aggregate to extract statistics such as the mean, quantile, etc.
+fc.mean <- aggregate(sfc.mos,year,'mean')
+#fc.upper <- aggregate(sfc.mos,year,'upper')
+#fc.lower <- aggregate(sfc.mos,year,'lower')
+
+dev.new()
+gridmap(subset(fc.mean,it=length(index(fc.mean))))
+points(lon(sfc.mos),lat(sfc.mos))
+text(lon(sfc.mos),lat(sfc.mos),loc(sfc.mos),pos=1,cex=0.7)
+lab <- paste(paste('ECMWF MOS',attr(Z,'mons'),collapse='-'),'starting in',
+             year(fc.mean)[length(index(fc.mean))])
+figlab(lab,xpos=0.35,ypos=0.99)
+dev.copy2pdf(file=paste(rname,'.map.pdf',sep=''))
+
+if (!is.null(sfc.int)) {
+  print('Maps for the interpolated seasonal forecasts')
+  browser()
+  fc0.mean <- aggregate(sfc.int,year,'mean')
+  y0 <- subset(fc0.mean,it=length(index(fc.mean)))
+  attr(y0,'longitude') <- lon(fc.mean)
+  attr(y0,'latitude') <- lat(fc.mean)
+  gridmap(y0)
+  lab0 <- paste(paste('ECMWF interpolated',attr(Z,'mons'),collapse='-'),
+                'starting in',year(fc0.mean)[length(index(fc0.mean))])
+  figlab(lab0,xpos=0.35,ypos=0.99)
+  dev.copy2pdf(file=paste(rname,'.int.map.pdf',sep=''))
+
+  FC0 <- aggregate(attr(Z,'sf4bmd'),year,'mean')
+  FC0 <- subset(FC0,it=length(index(FC0)))
+  map(subset(FC0,is=list(lon=range(lon(fc.mean)),lat=range(lat(fc.mean)))))
+  lab0 <- paste(paste('ECMWF original',attr(Z,'mons'),collapse='-'),
+                'starting in',year(FC0)[length(index(FC0))])
+  figlab(lab0,xpos=0.35,ypos=0.99)
+  dev.copy2pdf(file=paste(rname,'.original.map.pdf',sep='')) 
+}
+## Plot the time series:
+dev.new()
+display.sf(sfc.mos,sfc.int)
+dev.copy2pdf(file=paste(rname,'.hcst.pdf',sep=''))
+  
+## Distribution
+dev.new()
+
+## Use the observations to define upper, neutral and lower categories
+Y3m <- obsthreemonths(subset(tx.bmd,it=c(1981,2010)),
+                             attr(sfc.mos,'mons'),FUN='mean')
+distribution.sf(sfc.mos,sfc.int,Y3m,is=1,col=c('blue','green','red'))
+dev.copy2pdf(file=paste(rname,'.tercile.pdf',sep=''))
+}
 
 ## End of the section with functions -------------------------------
 
@@ -434,36 +566,10 @@ if (!file.exists('bmd.rda')) {
 #gridmap(annual(subset(tx.bmd,it=c(1990,2015))))
 #gridmap(annual(subset(tn.bmd,it=c(1990,2015))))
 
-## Downscaled seasonal forecasts based on MOS and PCA representation
-## of predictands:
-Z <- downscaleSFC(tx.bmd,param='T2M',
-                  path='sesong4bmd',pattern='fcmean.mmsa.')
-sfc.mos <- as.station(predict(Z,newdata=attr(Z,'eof.fcst')))
+## Temperature
+print('MOS for temperature')
+t2m <- dailymeanT(tx.bmd,tn.bmd)
+sf(t2m)
 
-## Get the seasonal forecasts interpolated directly from the models:
-sfc.int <- regrid(attr(Z,'sf4bmd'),is=attr(Z,'Y'))
-
-## Save the results for furthr processing
-save(file='bmd-results.rda',Z,sfc.mos,sfc.int)
-
-## Use aggregate to extract statistics such as the mean, quantile, etc.
-fc.mean <- aggregate(sfc.mos,year,'mean')
-fc.upper <- aggregate(sfc.mos,year,'upper')
-fc.lower <- aggregate(sfc.mos,year,'lower')
-
-dev.new()
-gridmap(subset(fc.mean,it=length(index(fc.mean))))
-points(lon(sfc.mos),lat(sfc.mos))
-text(lon(sfc.mos),lat(sfc.mos),loc(sfc.mos),pos=1,cex=0.7)
-lab <- paste(paste(attr(Z,'mons'),collapse='-'),'starting in',
-             index(fc.mean)[length(index(fc.mean))])
-figlab(lab,xpos=0.5,ypos=0.99)
-
-## Plot the time series:
-dev.new()
-display.sf(sfc.mos,sfc.int)
-
-## Distribution
-dev.new()
-distribution.sf(sfc.mos,sfc.int)
-
+print('MOS for precipitation')
+sf(pr.bmd,param='MSL',FUN='sum')

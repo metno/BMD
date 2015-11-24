@@ -173,11 +173,12 @@ forecast2field <- function(x,member=1,lag=1,verbose=FALSE) {
 
 gridmap <- function(Y,breaks=NULL,colbar=NULL,verbose=FALSE) {
 
-  print('gridmap')
+  print('gridmap'); print(lon(Y)); print(lat(Y))
   require(LatticeKrig)
 
   y <- apply(annual(Y,FUN='sum'),2,'mean',na.rm=TRUE)
-
+  str(y)
+  
   ## Get data on the topography on the 5-minute resolution
   data(etopo5)
   etopo5 <- subset(etopo5,
@@ -192,8 +193,9 @@ gridmap <- function(Y,breaks=NULL,colbar=NULL,verbose=FALSE) {
 
   ## Flag dubplicated stations:
   ok <- !(duplicated(lon(Y)) & duplicated(lat(Y)))
-
-  ## Spread in the  90-percente interval changing
+  print(paste(sum(ok),'valid locations'))
+  
+  ## grid...
   print('call LatticeKrig')
   obj <- LatticeKrig( x=cbind(lon(Y)[ok],lat(Y)[ok]),
                       y=y[ok],Z=alt(Y)[ok])
@@ -209,16 +211,21 @@ gridmap <- function(Y,breaks=NULL,colbar=NULL,verbose=FALSE) {
   detach("package:grid")
   detach("package:maps")
 
-  ## Convert the results from LatticeKrig to esd:
-  print('plot map')
   W <- w$z
+
+  ## Check for valid data
+  if (sum(is.finite(c(W)))==0) {
+    print('Gridding failed - no valid data')
+    return(W)
+  }
+
+  print('plot map')
+  ## Convert the results from LatticeKrig to esd:
   attr(W,'variable') <- varid(Y)[1]
   attr(W,'unit') <- unit(Y)[1]
   attr(W,'longitude') <- w$x
   attr(W,'latitude') <- w$y
   class(W) <- class(etopo5)
-
-  ## Make a projection that zooms in on the Barents region
 
   if (is.null(colbar)) colbar <- list()
   colbar$rev <- switch(varid(Y)[1],'t2m'=FALSE,'precip'=TRUE)
@@ -226,7 +233,9 @@ gridmap <- function(Y,breaks=NULL,colbar=NULL,verbose=FALSE) {
   if (is.null(colbar$breaks))
     colbar$breaks <- round(seq(-Wx,Wx,length=31),2) 
   if (is.null(colbar$pal)) colbar$pal <- varid(Y)[1]
-  map(W,xlim=range(lon(W)),ylim=range(lat(W)),colbar=colbar)
+  print(colbar);str(W)
+#  map(W,xlim=range(lon(W)),ylim=range(lat(W)),colbar=colbar,verbose=verbose)
+  map(W,verbose=verbose)
   invisible(W)
 }
 
@@ -513,7 +522,7 @@ dev.new()
 if (is.T(fc.mean))
   colbar <- list(pal='t2m',breaks=seq(-3,3,by=0.25),rev=TRUE) else
   colbar <- NULL
-gridmap(subset(fc.mean,it=length(index(fc.mean))),colbar=colbar)
+gridmap(subset(fc.mean,it=length(index(fc.mean))),colbar=colbar,verbose=TRUE)
 points(lon(sfc.mos),lat(sfc.mos))
 text(lon(sfc.mos),lat(sfc.mos),loc(sfc.mos),pos=1,cex=0.7)
 lab <- paste(paste('ECMWF MOS',attr(Z,'mons'),collapse='-'),'starting in',
@@ -582,6 +591,23 @@ if (!file.exists('bmd.rda')) {
 #gridmap(annual(subset(pr.bmd,it=c(1990,2015)),FUN='sum'))
 #gridmap(annual(subset(tx.bmd,it=c(1990,2015))))
 #gridmap(annual(subset(tn.bmd,it=c(1990,2015))))
+
+# test:
+if (FALSE) {
+if (!exists('z')) {
+  load('sesong4bmd/bmd.results.precip.rda')
+  fc.mean <- aggregate(sfc.mos,year,'mean')
+  z <- subset(fc.mean,it=length(index(fc.mean)))
+  attr(z,'predictor.pattern') <- NULL
+  attr(z,'eof') <- NULL
+  attr(z,'original_data') <- NULL
+  attr(z,'calibration_data') <- NULL
+  attr(z,'eof.fcst') <- NULL
+  attr(z,'sf4bmd') <- NULL
+  attr(z,'Y') <- NULL
+}
+gridmap(z,verbose=TRUE)
+}
 
 ## Temperature
 print('MOS for temperature')

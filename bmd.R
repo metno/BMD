@@ -22,7 +22,7 @@ lon <- c(50,180)
 upper <- function(x) mean(x,na.rm=TRUE) + 2*sd(x,na.rm=TRUE)
 lower <- function(x) mean(x,na.rm=TRUE) - 2*sd(x,na.rm=TRUE)
 
-readBMD <- function(fname='~/Desktop/BMD/rain',verbose=TRUE,exclude=NULL) {
+readBMD <- function(fname='~/Dropbox/BMD/rain',verbose=TRUE,exclude=NULL) {
   ## Read the data from the BMD and prepare as esd station object.
   param <- switch(substr(fname,nchar(fname)-3,nchar(fname)),
                   'rain'='precip','tmax'='tmax','tmin'='tmin')
@@ -35,7 +35,7 @@ readBMD <- function(fname='~/Desktop/BMD/rain',verbose=TRUE,exclude=NULL) {
   if (verbose) print(param)
   Y <- read.table(fname,na.strings="***",
                   col.names=c('stid','year','month','day',param))
-  meta <- read.table('~/Desktop/BMD/StList',header=TRUE,sep=',',as.is=TRUE)
+  meta <- read.table('~/Dropbox/BMD/StList',header=TRUE,sep=',',as.is=TRUE)
   stations <- as.character(rownames(table(Y$stid)))
   il <- 0
   if (!is.null(exclude)) stations <- stations[!is.element(stations,exclude)]
@@ -171,7 +171,9 @@ forecast2field <- function(x,member=1,lag=1,verbose=FALSE) {
   return(y)
 }
 
-gridmap <- function(Y,breaks=NULL,pal=NULL,verbose=FALSE) {
+gridmap <- function(Y,breaks=NULL,colbar=NULL,verbose=FALSE) {
+
+  print('gridmap')
   require(LatticeKrig)
 
   y <- apply(annual(Y,FUN='sum'),2,'mean',na.rm=TRUE)
@@ -185,12 +187,14 @@ gridmap <- function(Y,breaks=NULL,pal=NULL,verbose=FALSE) {
   etopo5[etopo5<=-1] <- NA
 
   ## Set the grid to be the same as that of etopo5:
+  print('define grid')
   grid <- structure(list(x=lon(etopo5),y=lat(etopo5)),class='gridList')
 
   ## Flag dubplicated stations:
   ok <- !(duplicated(lon(Y)) & duplicated(lat(Y)))
 
   ## Spread in the  90-percente interval changing
+  print('call LatticeKrig')
   obj <- LatticeKrig( x=cbind(lon(Y)[ok],lat(Y)[ok]),
                       y=y[ok],Z=alt(Y)[ok])
 
@@ -206,6 +210,7 @@ gridmap <- function(Y,breaks=NULL,pal=NULL,verbose=FALSE) {
   detach("package:maps")
 
   ## Convert the results from LatticeKrig to esd:
+  print('plot map')
   W <- w$z
   attr(W,'variable') <- varid(Y)[1]
   attr(W,'unit') <- unit(Y)[1]
@@ -218,9 +223,10 @@ gridmap <- function(Y,breaks=NULL,pal=NULL,verbose=FALSE) {
   rev <- switch(varid(Y)[1],'t2m'=FALSE,'precip'=TRUE)
   Wx <- max(abs(W),na.rm=TRUE)
   if (is.null(breaks)) breaks <- round(seq(-Wx,Wx,length=31),2) 
-  if (is.null(pal)) pal <- varid(Y)[1]
+  if (is.null(colbar$pal)) colbar$pal <- varid(Y)[1]
+  browser()
   map(W,xlim=range(lon(W)),ylim=range(lat(W)),
-      colbar=list(pal=pal))
+      colbar=colbar)
   invisible(W)
 }
 
@@ -262,6 +268,7 @@ downscaleSFC <- function(tx.bmd,FUN='mean',param='T2M',
                          plot=FALSE,verbose=FALSE,n=3,
                          path='sesong4bmd',pattern='fcmean.mmsa.') {
 
+  print('downscaleSFC:')
   ## Process the predictors: --------------------------------------
   ## Retrieve the predictors from sf system 4 (MOS): from /opdata
   print('Read the predictors from seasonal forecasts')
@@ -278,6 +285,7 @@ downscaleSFC <- function(tx.bmd,FUN='mean',param='T2M',
   pred.list <- pred.list[grep(substr(lf,nchar(lf)-9,nchar(lf)),pred.list)]
 
   ## Read all the hind/forecast files and combine into one array
+  print('Read fore/hindcasts')
   for (i in 1:length(pred.list)) {
     print(pred.list[i])
     if (i==1) X <- readfcst(pred.list[i],lon=lon,lat=lat) else {
@@ -390,8 +398,9 @@ display.sf <- function(x,x0=NULL,is=1) {
   t <- year(y)
   par(bty='n')
   varid <- switch(varid(x)[1],'tmax'='T[max]','tmin'='T[min]',
-                  'pr'='precip')
+                  't2m'='T[2*m]','pr'='precip','precip'='precip')
   if (unit(x)[1]=='degC') unit <- 'degree*C'
+  print(c(varid,unit))
   ylab <- eval(parse(text=paste('expression(',varid,
                        ' * ~(',unit[1],'))')))
   plot(t,y,cex=3,pch=19,col=rgb(0.5,0.5,0.5,0.15),
@@ -433,9 +442,10 @@ distribution.sf <- function(x,x0=NULL,Y3m=NULL,col=c('blue','green','red'),
   if (is.null(it)) it <- year(y)[length(index(y))]
   y <- subset(y,it=it)
   par(bty='n')
-    varid <- switch(varid(x)[1],'tmax'='T[max]','tmin'='T[min]',
-                  'pr'='precip')
+  varid <- switch(varid(x)[1],'tmax'='T[max]','tmin'='T[min]',
+                  't2m'='T[2*m]','pr'='precip','precip'='precip')
   if (unit(x)[1]=='degC') unit <- 'degree*C'
+  print(c(varid,unit))
   xlab <- eval(parse(text=paste('expression(',varid,
                        ' * ~(',unit[1],'))')))
   if (is.null(breaks)) {
@@ -500,7 +510,8 @@ fc.mean <- aggregate(sfc.mos,year,'mean')
 #fc.lower <- aggregate(sfc.mos,year,'lower')
 
 dev.new()
-gridmap(subset(fc.mean,it=length(index(fc.mean))))
+colbar <- list(pal='t2m',breaks=seq(-3,3,by=0.25),rev=TRUE)
+gridmap(subset(fc.mean,it=length(index(fc.mean))),colbar=colbar)
 points(lon(sfc.mos),lat(sfc.mos))
 text(lon(sfc.mos),lat(sfc.mos),loc(sfc.mos),pos=1,cex=0.7)
 lab <- paste(paste('ECMWF MOS',attr(Z,'mons'),collapse='-'),'starting in',
@@ -510,33 +521,37 @@ dev.copy2pdf(file=paste(rname,'.map.pdf',sep=''))
 
 if (!is.null(sfc.int)) {
   print('Maps for the interpolated seasonal forecasts')
-  browser()
   fc0.mean <- aggregate(sfc.int,year,'mean')
   y0 <- subset(fc0.mean,it=length(index(fc.mean)))
   attr(y0,'longitude') <- lon(fc.mean)
   attr(y0,'latitude') <- lat(fc.mean)
-  gridmap(y0)
+  dev.new()
+  gridmap(y0,colbar=colbar)
   lab0 <- paste(paste('ECMWF interpolated',attr(Z,'mons'),collapse='-'),
                 'starting in',year(fc0.mean)[length(index(fc0.mean))])
   figlab(lab0,xpos=0.35,ypos=0.99)
   dev.copy2pdf(file=paste(rname,'.int.map.pdf',sep=''))
 
   FC0 <- aggregate(attr(Z,'sf4bmd'),year,'mean')
-  FC0 <- subset(FC0,it=length(index(FC0)))
-  map(subset(FC0,is=list(lon=range(lon(fc.mean)),lat=range(lat(fc.mean)))))
+  nfc0 <- length(index(FC0))
+  FC0 <- subset(FC0,it=is.element(1:nfc0,nfc0))
+  dev.new()
+  map(subset(FC0,is=list(lon=range(lon(fc.mean)),lat=range(lat(fc.mean)))),
+     colbar=colbar)
   lab0 <- paste(paste('ECMWF original',attr(Z,'mons'),collapse='-'),
                 'starting in',year(FC0)[length(index(FC0))])
   figlab(lab0,xpos=0.35,ypos=0.99)
   dev.copy2pdf(file=paste(rname,'.original.map.pdf',sep='')) 
 }
 ## Plot the time series:
+  print('Plot time series:')
 dev.new()
 display.sf(sfc.mos,sfc.int)
 dev.copy2pdf(file=paste(rname,'.hcst.pdf',sep=''))
   
 ## Distribution
 dev.new()
-
+  print('Plot distributions:')
 ## Use the observations to define upper, neutral and lower categories
 Y3m <- obsthreemonths(subset(tx.bmd,it=c(1981,2010)),
                              attr(sfc.mos,'mons'),FUN='mean')

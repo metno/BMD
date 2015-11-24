@@ -220,13 +220,13 @@ gridmap <- function(Y,breaks=NULL,colbar=NULL,verbose=FALSE) {
 
   ## Make a projection that zooms in on the Barents region
 
-  rev <- switch(varid(Y)[1],'t2m'=FALSE,'precip'=TRUE)
+  if (is.null(colbar)) colbar <- list()
+  colbar$rev <- switch(varid(Y)[1],'t2m'=FALSE,'precip'=TRUE)
   Wx <- max(abs(W),na.rm=TRUE)
-  if (is.null(breaks)) breaks <- round(seq(-Wx,Wx,length=31),2) 
+  if (is.null(colbar$breaks))
+    colbar$breaks <- round(seq(-Wx,Wx,length=31),2) 
   if (is.null(colbar$pal)) colbar$pal <- varid(Y)[1]
-  browser()
-  map(W,xlim=range(lon(W)),ylim=range(lat(W)),
-      colbar=colbar)
+  map(W,xlim=range(lon(W)),ylim=range(lat(W)),colbar=colbar)
   invisible(W)
 }
 
@@ -510,7 +510,9 @@ fc.mean <- aggregate(sfc.mos,year,'mean')
 #fc.lower <- aggregate(sfc.mos,year,'lower')
 
 dev.new()
-colbar <- list(pal='t2m',breaks=seq(-3,3,by=0.25),rev=TRUE)
+if (is.T(fc.mean))
+  colbar <- list(pal='t2m',breaks=seq(-3,3,by=0.25),rev=TRUE) else
+  colbar <- NULL
 gridmap(subset(fc.mean,it=length(index(fc.mean))),colbar=colbar)
 points(lon(sfc.mos),lat(sfc.mos))
 text(lon(sfc.mos),lat(sfc.mos),loc(sfc.mos),pos=1,cex=0.7)
@@ -588,3 +590,4 @@ sf(t2m)
 
 print('MOS for precipitation')
 sf(pr.bmd,param='MSL',FUN='sum')
+

@@ -408,10 +408,11 @@ display.sf <- function(x,x0=NULL,is=1) {
   par(bty='n')
   varid <- switch(varid(x)[1],'tmax'='T[max]','tmin'='T[min]',
                   't2m'='T[2*m]','pr'='precip','precip'='precip')
-  if (unit(x)[1]=='degC') unit <- 'degree*C'
+  if (unit(x)[1]=='degC') unit <- 'degree*C' else
+                          unit <- unit(x)[1]
   print(c(varid,unit))
   ylab <- eval(parse(text=paste('expression(',varid,
-                       ' * ~(',unit[1],'))')))
+                       ' * ~(',unit,'))')))
   plot(t,y,cex=3,pch=19,col=rgb(0.5,0.5,0.5,0.15),
        main=loc(y),ylab=ylab,xlab='year')
   grid()
@@ -453,10 +454,11 @@ distribution.sf <- function(x,x0=NULL,Y3m=NULL,col=c('blue','green','red'),
   par(bty='n')
   varid <- switch(varid(x)[1],'tmax'='T[max]','tmin'='T[min]',
                   't2m'='T[2*m]','pr'='precip','precip'='precip')
-  if (unit(x)[1]=='degC') unit <- 'degree*C'
+  if (unit(x)[1]=='degC') unit <- 'degree*C' else
+                          unit <- unit(x)[1]
   print(c(varid,unit))
   xlab <- eval(parse(text=paste('expression(',varid,
-                       ' * ~(',unit[1],'))')))
+                       ' * ~(',unit,'))')))
   if (is.null(breaks)) {
     yx <- max(abs(coredata(y)),na.rm=TRUE)
     if (is.null(Y3m)) breaks <- round(seq(-yx,yx,length=7)) else {
@@ -525,7 +527,7 @@ if (is.T(fc.mean))
 gridmap(subset(fc.mean,it=length(index(fc.mean))),colbar=colbar,verbose=TRUE)
 points(lon(sfc.mos),lat(sfc.mos))
 text(lon(sfc.mos),lat(sfc.mos),loc(sfc.mos),pos=1,cex=0.7)
-lab <- paste(paste('ECMWF MOS',attr(Z,'mons'),collapse='-'),'starting in',
+lab <- paste('ECMWF MOS',paste(attr(Z,'mons'),collapse='-'),'starting in',
              year(fc.mean)[length(index(fc.mean))])
 figlab(lab,xpos=0.35,ypos=0.99)
 dev.copy2pdf(file=paste(rname,'.map.pdf',sep=''))
@@ -614,6 +616,6 @@ print('MOS for temperature')
 t2m <- dailymeanT(tx.bmd,tn.bmd)
 sf(t2m)
 
+## Precipitation
 print('MOS for precipitation')
 sf(pr.bmd,param='MSL',FUN='sum')
-

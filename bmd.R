@@ -540,7 +540,7 @@ if (!is.null(sfc.int)) {
   attr(y0,'latitude') <- lat(fc.mean)
   dev.new()
   gridmap(y0,colbar=colbar)
-  lab0 <- paste(paste('ECMWF interpolated',attr(Z,'mons'),collapse='-'),
+  lab0 <- paste('ECMWF interpolated',paste(attr(Z,'mons'),collapse='-'),
                 'starting in',year(fc0.mean)[length(index(fc0.mean))])
   figlab(lab0,xpos=0.35,ypos=0.99)
   dev.copy2pdf(file=paste(rname,'.int.map.pdf',sep=''))
@@ -551,7 +551,7 @@ if (!is.null(sfc.int)) {
   dev.new()
   map(subset(FC0,is=list(lon=range(lon(fc.mean)),lat=range(lat(fc.mean)))),
      colbar=colbar)
-  lab0 <- paste(paste('ECMWF original',attr(Z,'mons'),collapse='-'),
+  lab0 <- paste('ECMWF original',paste(attr(Z,'mons'),collapse='-'),
                 'starting in',year(FC0)[length(index(FC0))])
   figlab(lab0,xpos=0.35,ypos=0.99)
   dev.copy2pdf(file=paste(rname,'.original.map.pdf',sep='')) 

@@ -171,14 +171,11 @@ forecast2field <- function(x,member=1,lag=1,verbose=FALSE) {
   return(y)
 }
 
-gridmap <- function(Y,breaks=NULL,colbar=NULL,verbose=FALSE) {
-
-  print('gridmap'); print(lon(Y)); print(lat(Y))
+gridmap <- function(Y,breaks=NULL,verbose=FALSE,colbar=NULL) {
   require(LatticeKrig)
 
   y <- apply(annual(Y,FUN='sum'),2,'mean',na.rm=TRUE)
-  str(y)
-  
+
   ## Get data on the topography on the 5-minute resolution
   data(etopo5)
   etopo5 <- subset(etopo5,
@@ -188,15 +185,12 @@ gridmap <- function(Y,breaks=NULL,colbar=NULL,verbose=FALSE) {
   etopo5[etopo5<=-1] <- NA
 
   ## Set the grid to be the same as that of etopo5:
-  print('define grid')
   grid <- structure(list(x=lon(etopo5),y=lat(etopo5)),class='gridList')
 
   ## Flag dubplicated stations:
   ok <- !(duplicated(lon(Y)) & duplicated(lat(Y)))
-  print(paste(sum(ok),'valid locations'))
-  
-  ## grid...
-  print('call LatticeKrig')
+
+  ## Spread in the  90-percente interval changing
   obj <- LatticeKrig( x=cbind(lon(Y)[ok],lat(Y)[ok]),
                       y=y[ok],Z=alt(Y)[ok])
 
@@ -211,31 +205,21 @@ gridmap <- function(Y,breaks=NULL,colbar=NULL,verbose=FALSE) {
   detach("package:grid")
   detach("package:maps")
 
-  W <- w$z
-
-  ## Check for valid data
-  if (sum(is.finite(c(W)))==0) {
-    print('Gridding failed - no valid data')
-    return(W)
-  }
-
-  print('plot map')
   ## Convert the results from LatticeKrig to esd:
+  W <- w$z
   attr(W,'variable') <- varid(Y)[1]
   attr(W,'unit') <- unit(Y)[1]
   attr(W,'longitude') <- w$x
   attr(W,'latitude') <- w$y
   class(W) <- class(etopo5)
 
-  if (is.null(colbar)) colbar <- list()
-  colbar$rev <- switch(varid(Y)[1],'t2m'=FALSE,'precip'=TRUE)
+  ## Make a projection that zooms in on the Barents region
+
+  rev <- switch(varid(Y)[1],'t2m'=FALSE,'precip'=TRUE)
   Wx <- max(abs(W),na.rm=TRUE)
-  if (is.null(colbar$breaks))
-    colbar$breaks <- round(seq(-Wx,Wx,length=31),2) 
-  if (is.null(colbar$pal)) colbar$pal <- varid(Y)[1]
-  print(colbar);str(W)
-#  map(W,xlim=range(lon(W)),ylim=range(lat(W)),colbar=colbar,verbose=verbose)
-  map(W,verbose=verbose)
+  if (is.null(breaks)) breaks <- round(seq(-Wx,Wx,length=31),2) 
+  map(W,xlim=range(lon(W)),ylim=range(lat(W)),
+      colbar=colbar,verbose=verbose)
   invisible(W)
 }
 
@@ -275,26 +259,26 @@ obsthreemonths <- function(x,mons,FUN='mean') {
 
 downscaleSFC <- function(tx.bmd,FUN='mean',param='T2M',
                          plot=FALSE,verbose=FALSE,n=3,
-                         path='sesong4bmd',pattern='fcmean.mmsa.') {
+                         path='sesong',pattern='fcmean.mmsa.') {
 
-  print('downscaleSFC:')
   ## Process the predictors: --------------------------------------
   ## Retrieve the predictors from sf system 4 (MOS): from /opdata
   print('Read the predictors from seasonal forecasts')
   pred.list <- list.files(path=path,pattern=pattern,
                           full.names=TRUE)
+
   if (length(pred.list)==0)
     stop('Cannot find the files with seasonal forecasts')
     
   ## Extract T2M (or SLP) fields:
   pred.list <- pred.list[grep(param,pred.list)]
+  if (length(pred.list)==0) {print('No matching seasonal forecasts')  ; browser()}
 
   ## Extract the last month:
   lf <- pred.list[length(pred.list)]
   pred.list <- pred.list[grep(substr(lf,nchar(lf)-9,nchar(lf)),pred.list)]
 
   ## Read all the hind/forecast files and combine into one array
-  print('Read fore/hindcasts')
   for (i in 1:length(pred.list)) {
     print(pred.list[i])
     if (i==1) X <- readfcst(pred.list[i],lon=lon,lat=lat) else {
@@ -408,11 +392,9 @@ display.sf <- function(x,x0=NULL,is=1) {
   par(bty='n')
   varid <- switch(varid(x)[1],'tmax'='T[max]','tmin'='T[min]',
                   't2m'='T[2*m]','pr'='precip','precip'='precip')
-  if (unit(x)[1]=='degC') unit <- 'degree*C' else
-                          unit <- unit(x)[1]
-  print(c(varid,unit))
+  if (unit(x)[1]=='degC') unit <- 'degree*C' else unit <- unit(x)[1]
   ylab <- eval(parse(text=paste('expression(',varid,
-                       ' * ~(',unit,'))')))
+                       ' * ~(',unit[1],'))')))
   plot(t,y,cex=3,pch=19,col=rgb(0.5,0.5,0.5,0.15),
        main=loc(y),ylab=ylab,xlab='year')
   grid()
@@ -452,13 +434,11 @@ distribution.sf <- function(x,x0=NULL,Y3m=NULL,col=c('blue','green','red'),
   if (is.null(it)) it <- year(y)[length(index(y))]
   y <- subset(y,it=it)
   par(bty='n')
-  varid <- switch(varid(x)[1],'tmax'='T[max]','tmin'='T[min]',
+    varid <- switch(varid(x)[1],'tmax'='T[max]','tmin'='T[min]',
                   't2m'='T[2*m]','pr'='precip','precip'='precip')
-  if (unit(x)[1]=='degC') unit <- 'degree*C' else
-                          unit <- unit(x)[1]
-  print(c(varid,unit))
+  if (unit(x)[1]=='degC') unit <- 'degree*C' else unit <- unit(x)[1]
   xlab <- eval(parse(text=paste('expression(',varid,
-                       ' * ~(',unit,'))')))
+                       ' * ~(',unit[1],'))')))
   if (is.null(breaks)) {
     yx <- max(abs(coredata(y)),na.rm=TRUE)
     if (is.null(Y3m)) breaks <- round(seq(-yx,yx,length=7)) else {
@@ -486,8 +466,8 @@ distribution.sf <- function(x,x0=NULL,Y3m=NULL,col=c('blue','green','red'),
   }
 }
 
-sf <- function(tx.bmd,anomaly=NULL,param='T2M',save=TRUE,FUN='mean',
-               path='sesong4bmd',pattern='fcmean.mmsa.',n=3,
+sf <- function(tx.bmd,is=1,anomaly=NULL,param='T2M',save=TRUE,FUN='mean',
+               path='sesong',pattern='fcmean.mmsa.',n=3,
                verbose=FALSE,plot=FALSE) {
   
   ## Default: if temperature, plot anomalies, but for precip show
@@ -503,7 +483,8 @@ Z <- downscaleSFC(tx.bmd,param=param,FUN=FUN,path=path,pattern=pattern,
                   n=n,plot=plot,verbose=verbose)
 
 sfc.mos <- as.station(predict(Z,newdata=attr(Z,'eof.fcst')))
-
+attr(sfc.mos,'variable') <- varid(tx.bmd)
+  
 ## Get the seasonal forecasts interpolated directly from the models if the
   ## predictand is the daily mean temperature:
 if (varid(tx.bmd)[1]=='t2m')
@@ -519,12 +500,11 @@ if (save) save(file=paste(rname,'.rda',sep=''),Z,sfc.mos,sfc.int)
 fc.mean <- aggregate(sfc.mos,year,'mean')
 #fc.upper <- aggregate(sfc.mos,year,'upper')
 #fc.lower <- aggregate(sfc.mos,year,'lower')
-
+  
+colbar <- list(breaks=pretty(coredata(fc.mean),n=11),pal=varid(tx.bmd)[1])
+  
 dev.new()
-if (is.T(fc.mean))
-  colbar <- list(pal='t2m',breaks=seq(-3,3,by=0.25),rev=TRUE) else
-  colbar <- NULL
-gridmap(subset(fc.mean,it=length(index(fc.mean))),colbar=colbar,verbose=TRUE)
+gridmap(subset(fc.mean,it=length(index(fc.mean))),colbar=colbar)
 points(lon(sfc.mos),lat(sfc.mos))
 text(lon(sfc.mos),lat(sfc.mos),loc(sfc.mos),pos=1,cex=0.7)
 lab <- paste('ECMWF MOS',paste(attr(Z,'mons'),collapse='-'),'starting in',
@@ -538,37 +518,33 @@ if (!is.null(sfc.int)) {
   y0 <- subset(fc0.mean,it=length(index(fc.mean)))
   attr(y0,'longitude') <- lon(fc.mean)
   attr(y0,'latitude') <- lat(fc.mean)
-  dev.new()
   gridmap(y0,colbar=colbar)
-  lab0 <- paste('ECMWF interpolated',paste(attr(Z,'mons'),collapse='-'),
+  lab0 <- paste('ECMWF interpolated',paste(paste(attr(Z,'mons'),collapse='-')),
                 'starting in',year(fc0.mean)[length(index(fc0.mean))])
   figlab(lab0,xpos=0.35,ypos=0.99)
   dev.copy2pdf(file=paste(rname,'.int.map.pdf',sep=''))
 
   FC0 <- aggregate(attr(Z,'sf4bmd'),year,'mean')
-  nfc0 <- length(index(FC0))
-  FC0 <- subset(FC0,it=is.element(1:nfc0,nfc0))
-  dev.new()
-  map(subset(FC0,is=list(lon=range(lon(fc.mean)),lat=range(lat(fc.mean)))),
-     colbar=colbar)
-  lab0 <- paste('ECMWF original',paste(attr(Z,'mons'),collapse='-'),
+  FC0 <- subset(FC0,it=length(index(FC0)))
+  map(subset(FC0,is=list(lon=range(lon(fc.mean)),lat=range(lat(fc.mean)))),colbar=colbar)
+  lab0 <- paste('ECMWF original',paste(paste(attr(Z,'mons'),collapse='-')),
                 'starting in',year(FC0)[length(index(FC0))])
   figlab(lab0,xpos=0.35,ypos=0.99)
   dev.copy2pdf(file=paste(rname,'.original.map.pdf',sep='')) 
 }
 ## Plot the time series:
-  print('Plot time series:')
+
 dev.new()
-display.sf(sfc.mos,sfc.int)
+display.sf(sfc.mos,sfc.int,is=is)
 dev.copy2pdf(file=paste(rname,'.hcst.pdf',sep=''))
   
 ## Distribution
 dev.new()
-  print('Plot distributions:')
+
 ## Use the observations to define upper, neutral and lower categories
 Y3m <- obsthreemonths(subset(tx.bmd,it=c(1981,2010)),
                              attr(sfc.mos,'mons'),FUN='mean')
-distribution.sf(sfc.mos,sfc.int,Y3m,is=1,col=c('blue','green','red'))
+distribution.sf(sfc.mos,sfc.int,Y3m,is=is,col=c('blue','green','red'))
 dev.copy2pdf(file=paste(rname,'.tercile.pdf',sep=''))
 }
 
@@ -584,8 +560,8 @@ if (!file.exists('bmd.rda')) {
   ## and save in an R-binary file to speed up ext analyses
   pr.bmd <- readBMD()
   ## Some of the temperature records have problems - wrong dates!
-  tx.bmd <- readBMD('~/Desktop/BMD/tmax',exclude='11927')
-  tn.bmd <- readBMD('~/Desktop/BMD/tmin',exclude=c('11927','41977'))
+  tx.bmd <- readBMD('~/Dropbox/BMD/tmax',exclude='11927')
+  tn.bmd <- readBMD('~/Dropbox/BMD/tmin',exclude=c('11927','41977'))
   save(file='bmd.rda',pr.bmd,tx.bmd,tn.bmd)
 } else load('bmd.rda')
 
@@ -594,28 +570,10 @@ if (!file.exists('bmd.rda')) {
 #gridmap(annual(subset(tx.bmd,it=c(1990,2015))))
 #gridmap(annual(subset(tn.bmd,it=c(1990,2015))))
 
-# test:
-if (FALSE) {
-if (!exists('z')) {
-  load('sesong4bmd/bmd.results.precip.rda')
-  fc.mean <- aggregate(sfc.mos,year,'mean')
-  z <- subset(fc.mean,it=length(index(fc.mean)))
-  attr(z,'predictor.pattern') <- NULL
-  attr(z,'eof') <- NULL
-  attr(z,'original_data') <- NULL
-  attr(z,'calibration_data') <- NULL
-  attr(z,'eof.fcst') <- NULL
-  attr(z,'sf4bmd') <- NULL
-  attr(z,'Y') <- NULL
-}
-gridmap(z,verbose=TRUE)
-}
-
 ## Temperature
 print('MOS for temperature')
 t2m <- dailymeanT(tx.bmd,tn.bmd)
-sf(t2m)
+sf(t2m,is=1)
 
-## Precipitation
 print('MOS for precipitation')
-sf(pr.bmd,param='MSL',FUN='sum')
+sf(pr.bmd,param='MSL',FUN='sum',is=1)

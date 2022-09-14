@@ -2,7 +2,6 @@ library(readxl)
 library(tidyr)
 library(readr)
 library(dplyr)
-library(RSQLite)
 
 my_read_obs <- function(file, sheet, year, parameter, cell_columns, set_trace_amount = F){
   # READ EXCEL FILE, BUT ONLY COLUMNS A TO AF. THESE CONTAIN MAXIMUM TEMPERATURE

@@ -62,7 +62,7 @@ for (i in 1:12){
   
   tmax.tmp <- tmax.tmp %>% filter(Stations %in% stations)
   
-  tmax.tmp[ , 2:dim(tmax.tmp)[2]] <- apply(tmax.tmp[ , dim(tmax.tmp)[2]], 2, function(x) as.numeric(x))
+  tmax.tmp[ , 2:dim(tmax.tmp)[2]] <- apply(tmax.tmp[ , 2:dim(tmax.tmp)[2]], 2, function(x) as.numeric(x))
   
   tmax.tmp <- pivot_longer(tmax.tmp, 
                            cols = 2:dim(tmax.tmp)[2], # dimension 2 is width of table

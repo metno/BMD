@@ -1,7 +1,10 @@
 
 library(esd)
 
-path <- "~/ESD_oslo_2018_monsoon_mean_temp"
+#path <- "~/ESD_oslo_2018_monsoon_mean_temp"
+#bmd_downscaling(path)
+
+bmd_downscaling <- function(path) {
 source(file.path(path,'DS.R'))
 source(file.path(path,'DSensemble.R'))
 source(file.path(path,'map.R'))
@@ -203,6 +206,7 @@ for(rcp in c("rcp26","rcp45","rcp85")) {
     
   }
 }
-
+  return(dse)
+}
 
 

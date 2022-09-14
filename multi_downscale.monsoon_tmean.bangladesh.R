@@ -205,37 +205,4 @@ for(rcp in c("rcp26","rcp45","rcp85")) {
 }
 
 
-## Visualize downscaled resuls:############################################################
-library(esd)
 
-files.dse <- list.files(path,pattern="dsensemble.tmean",full.names=TRUE)
-print(files.dse)
-filename.dse <- files.dse[[2]] # 1= Dhaka.rda,    ### 2=Khunla.rda, ### 3=Satkhira
-load(filename.dse)
-it.season <- attr(dse.all,"it")
-
-## Set the range:
-ylim <- c(10,25)  #winter min range
-#ylim <- c(15,30)   #pre-monsoon min range
-## Plot the results:
-rcp <- "rcp45"
-dse <- dse.all[[rcp]]
-## Produce and save figure:
-filename.fig <- file.path(path.fig,
-                          paste("dsensemble.tmean.",loc(attr(dse,"station")),
-                                ".",paste(it.season,collapse=""),
-                                ".",rcp,".png",sep="") )
-#pdf(file=filename.fig, width=8, height=6)
-dev.new()
-plot(dse,ylim=ylim,
-     target.show=FALSE,map.show=FALSE,new=FALSE,legend.show=FALSE)
-title(paste("Monsoon mean temperature "," (",rcp,")\n",
-            loc(attr(dse,"station")),sep=""))
-dev.print(png,filename.fig, width=500, height=450)
-dev.off()
-
-#dev.copy(file="t2m.annualmean.png") ??
-#pdf(file="t2m.seasonalcycle.pdf",width=8,height=6)
-#T2M.cycle <- aggregate(t2m,month,FUN='mean')
-#plot(T2M.cycle,new=FALSE)
-#dev.off()

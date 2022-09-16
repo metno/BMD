@@ -1,9 +1,8 @@
-
 library(esd)
 require(devtools)
 
 ## Source the file with useful functions directly from github
-source_url("https://raw.githubusercontent.com/metno/BMD/master/R/Functions/functions_heatwaves.R")
+source_url("https://raw.githubusercontent.com/metno/BMD/master/R/functions_heatwaves.R")
 
 ## Change path to your file structure
 path.data <- "/path/to/data"

@@ -41,9 +41,8 @@ cdo monmean heatdays_BangladeshBox_MPI-ESM1-2-HR_ssp585_r1i1p1f1_1981-2100.nc mo
 ## Split into single months, addin names of the months to the filenames (%B)
 cdo splitmon,%B monmean_heatdays_BangladeshBox_MPI-ESM1-2-HR_ssp585_r1i1p1f1_1981-2100.nc monmean_heatdays_BangladeshBox_MPI-ESM1-2-HR_ssp585_r1i1p1f1_1981-2100_
 
-
-Calculate climatology 1991-2020 (current climate)
+### Calculate climatology 1991-2020 (current climate)
 cdo -ymonmean -selyear,1991/2020 monmean_heatdays_BangladeshBox_MPI-ESM1-2-HR_ssp585_r1i1p1f1_1981-2100.nc ymonmean_heatdays_BangladeshBox_MPI-ESM1-2-HR_ssp585_r1i1p1f1_1991-2020.nc
 
-Calculate climatology 2071-2100 (future climate)
+### Calculate climatology 2071-2100 (future climate)
 cdo -ymonmean -selyear,2071/2100 monmean_heatdays_BangladeshBox_MPI-ESM1-2-HR_ssp585_r1i1p1f1_1981-2100.nc ymonmean_heatdays_BangladeshBox_MPI-ESM1-2-HR_ssp585_r1i1p1f1_2071-2100.nc

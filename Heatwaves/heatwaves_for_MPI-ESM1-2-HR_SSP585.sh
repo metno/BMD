@@ -18,6 +18,7 @@ do cdo -sellonlatbox,87.5,93,20,27 https://thredds.met.no/thredds/dodsC/metusers
 done
 
 ### Get the corresponding historical data (directly from NASA):
+### This can be replaced with using your local files
 for ((year=1981;year<=2014;year++))
 #download the global data
 do wget https://ds.nccs.nasa.gov/thredds/fileServer/AMES/NEX/GDDP-CMIP6/MPI-ESM1-2-HR/historical/r1i1p1f1/tasmax/tasmax_day_MPI-ESM1-2-HR_historical_r1i1p1f1_gn_${year}.nc

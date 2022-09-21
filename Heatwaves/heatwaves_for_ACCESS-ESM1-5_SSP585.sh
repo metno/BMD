@@ -12,7 +12,7 @@
 # A subset covering the Bangladesh box can be found at
 # https://thredds.met.no/thredds/catalog/metusers/andreasd/tilBMD/NEX-GDDP-CMIP6/CMIP6_Tmax_SSP585/catalog.html
 
-### Cut out a box from the SSP5-8.5 NEX-GDDP-CMIP6 data, MPI-ESM1-2-HR model
+### Cut out a box from the SSP5-8.5 NEX-GDDP-CMIP6 data, ACCESS-ESM1-5 model
 for ((year=2015;year<=2100;year++))
 do cdo -sellonlatbox,87.5,93,20,27 https://thredds.met.no/thredds/dodsC/metusers/andreasd/tilBMD/NEX-GDDP-CMIP6/CMIP6_Tmax_SSP585/Tmax_ACCESS-ESM1-5_ssp585/tasmax_day_ACCESS-ESM1-5_ssp585_r1i1p1f1_gn_${year}.nc BangladeshBox_tasmax_day_ACCESS-ESM1-5_ssp585_r1i1p1f1_gn_${year}.nc
 done
